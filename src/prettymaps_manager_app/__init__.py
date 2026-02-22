@@ -1,0 +1,2 @@
+"""PrettyMapsManager GUI application package."""
+

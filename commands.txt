@@ -1,0 +1,31 @@
+# filter roads by len
+"highway" = 'trunk' AND ST_Length(way) > 20
+
+
+# Elevation maps - 2x the resolution
+gdalwarp -cutline "F:\PrettyMaps\Projects\1_Japan\textures\map.geojson" `
+  -crop_to_cutline -ot Float32 -co COMPRESS=ZIP -ts 28800 0 -r lanczos `
+  "F:\PrettyMaps\Datasets\AW3D30\aw3d30.vrt" `
+  -overwrite F:\PrettyMaps\Projects\1_Japan\textures\japan_elevation_28800_32.tif
+
+# OIIOTOOL on elevation map
+oiiotool `
+  /Volumes/Vault/PrettyMaps/Projects/1_Japan/textures/japan_elevation_28800_32.tif `
+  -d half -compression zip `
+  -otex /Volumes/Vault/PrettyMaps/Projects/1_Japan/textures/japan_elevation_28800_16.exr
+
+set -x VIRTUAL_ENV /Users/tas/Documents/code/PrettyMaps/.venv; set -x PATH /Users/tas/Documents/code/PrettyMaps/.venv/bin $PATH
+
+# gdaladdo on mac
+gdaladdo -r average \
+  --config COMPRESS_OVERVIEW DEFLATE \
+  --config INTERLEAVE_OVERVIEW PIXEL \
+  --config GDAL_NUM_THREADS ALL_CPUS \
+  /Volumes/PrettyMapsDatasets/AW3D30/aw3d30_mac.vrt 2 4 8 16 32 64
+
+# gdaladdo on windows
+gdaladdo -r average `
+  --config COMPRESS_OVERVIEW DEFLATE `
+  --config INTERLEAVE_OVERVIEW PIXEL `
+  --config GDAL_NUM_THREADS ALL_CPUS `
+  "Z:\PrettyMaps\Datasets\AW3D30\aw3d30.vrt" 2 4 8 16 32 64

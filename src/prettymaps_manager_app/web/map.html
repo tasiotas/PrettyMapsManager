@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrettyMaps Map</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+  <style>
+    html, body, #map {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  ></script>
+
+  <script>
+    let pyBridge = null;
+    let currentSelectionLayer = null;
+
+    const map = L.map("map", {
+      worldCopyJump: true,
+      zoomControl: true
+    }).setView([35.681, 139.767], 5);
+
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    const topo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      attribution:
+        'Map data: &copy; OpenStreetMap contributors, SRTM | Cartography: &copy; OpenTopoMap'
+    });
+    const noBasemap = L.layerGroup();
+
+    const drawLayer = new L.FeatureGroup().addTo(map);
+    const countryBordersLayer = L.geoJSON(null, {
+      style: function () {
+        return {
+          color: "#f4f4f4",
+          weight: 1,
+          opacity: 0.7,
+          fillColor: "#3f6b4f",
+          fillOpacity: 0.04
+        };
+      }
+    }).addTo(map);
+
+    const baseLayers = {
+      "OSM": osm,
+      "OpenTopoMap": topo,
+      "None (Borders only)": noBasemap
+    };
+    const overlays = {
+      "Country borders": countryBordersLayer,
+      "Selection": drawLayer
+    };
+    L.control.layers(baseLayers, overlays).addTo(map);
+
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polyline: false,
+        circle: false,
+        marker: false,
+        circlemarker: false,
+        polygon: {
+          allowIntersection: false,
+          showArea: true
+        },
+        rectangle: true
+      },
+      edit: {
+        featureGroup: drawLayer,
+        edit: true,
+        remove: true
+      }
+    });
+    map.addControl(drawControl);
+
+    function connectBridge() {
+      if (!window.qt || !window.qt.webChannelTransport) {
+        return;
+      }
+      new QWebChannel(window.qt.webChannelTransport, function (channel) {
+        pyBridge = channel.objects.pyBridge;
+      });
+    }
+
+    function latLngToLonLatRing(latlngs) {
+      const ring = latlngs.map((ll) => [ll.lng, ll.lat]);
+      if (ring.length > 0) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) {
+          ring.push([first[0], first[1]]);
+        }
+      }
+      return ring;
+    }
+
+    function selectionPayload(layer, selectionType) {
+      const geojson = layer.toGeoJSON();
+      const bounds = layer.getBounds();
+      return {
+        selectionType: selectionType,
+        bbox: [
+          bounds.getWest(),
+          bounds.getSouth(),
+          bounds.getEast(),
+          bounds.getNorth()
+        ],
+        geometry: geojson.geometry
+      };
+    }
+
+    function publishSelection(layer, selectionType) {
+      if (!pyBridge) {
+        return;
+      }
+      const payload = selectionPayload(layer, selectionType);
+      pyBridge.selectionChanged(JSON.stringify(payload));
+    }
+
+    function registerSelection(layer, selectionType) {
+      drawLayer.clearLayers();
+      drawLayer.addLayer(layer);
+      currentSelectionLayer = layer;
+      publishSelection(layer, selectionType);
+    }
+
+    map.on(L.Draw.Event.CREATED, function (event) {
+      const kind = event.layerType === "rectangle" ? "rectangle" : "polygon";
+      registerSelection(event.layer, kind);
+    });
+
+    map.on(L.Draw.Event.EDITED, function () {
+      if (currentSelectionLayer) {
+        publishSelection(currentSelectionLayer, "edited");
+      }
+    });
+
+    map.on(L.Draw.Event.DELETED, function () {
+      currentSelectionLayer = null;
+      if (pyBridge) {
+        pyBridge.selectionChanged(
+          JSON.stringify({
+            selectionType: "none",
+            bbox: [0, 0, 0, 0],
+            geometry: null
+          })
+        );
+      }
+    });
+
+    map.on("click", function (event) {
+      const ll = event.latlng;
+      if (pyBridge) {
+        pyBridge.mapClicked(ll.lat, ll.lng);
+      }
+    });
+
+    window.setSelectionFromPayload = function (payload) {
+      try {
+        const data = typeof payload === "string" ? JSON.parse(payload) : payload;
+        if (!data || !data.geometry) {
+          window.clearSelection();
+          return;
+        }
+
+        const feature = {
+          type: "Feature",
+          properties: {},
+          geometry: data.geometry
+        };
+        const geo = L.geoJSON(feature);
+        const layers = [];
+        geo.eachLayer(function (layer) {
+          layers.push(layer);
+        });
+        if (layers.length === 0) {
+          window.clearSelection();
+          return;
+        }
+        registerSelection(layers[0], data.selectionType || "polygon");
+      } catch (error) {
+        console.warn("Could not restore map selection from payload.", error);
+      }
+    };
+
+    window.clearSelection = function () {
+      drawLayer.clearLayers();
+      currentSelectionLayer = null;
+      if (pyBridge) {
+        pyBridge.selectionChanged(
+          JSON.stringify({
+            selectionType: "none",
+            bbox: [0, 0, 0, 0],
+            geometry: null
+          })
+        );
+      }
+    };
+
+    async function loadCountryBorders() {
+      const url =
+        "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        countryBordersLayer.addData(data);
+      } catch (error) {
+        console.warn("Country borders could not load from remote GeoJSON.", error);
+      }
+    }
+
+    connectBridge();
+    loadCountryBorders();
+  </script>
+</body>
+</html>

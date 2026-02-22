@@ -1,0 +1,23 @@
+# PrettyMapsManager configuration
+# Edit these paths for your machine. Keep both mac and windows paths filled.
+
+[paths]
+master_projects_dir_mac = "/Volumes/Vault/PrettyMaps/Projects"
+master_projects_dir_windows = "F:/PrettyMaps/Projects"
+
+elevation_vrt_mac = "/Volumes/Vault/PrettyMaps/Datasets/AW3D30/aw3d30_mac.vrt"
+elevation_vrt_windows = "F:/PrettyMaps/Datasets/AW3D30/aw3d30.vrt"
+
+[database]
+host = "staging.taslab.lan"
+port = 5443
+name = "osm_topo_app"
+user = "SRoVfQiHuQsItlaWsCBKrbAoRERIqWTU"
+password = "hi5pw9Fry7Bg8vzsdtCRUuepwpsIWwosU4j5hUUgpi4Gllgi6ygmCTZHQZUq67m4"
+
+[defaults]
+elevation_width = 2880
+map_width = 4096
+map_scale_factor = 2
+map_max_workers = 4
+buildings_workers = 24
