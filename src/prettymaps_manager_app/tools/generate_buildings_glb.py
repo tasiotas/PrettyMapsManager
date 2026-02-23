@@ -31,20 +31,22 @@ except ModuleNotFoundError:
     MISSING_REQUIRED_DEPS.append("psycopg2-binary")
 
 try:
-    from pygltflib import ARRAY_BUFFER
-    from pygltflib import ELEMENT_ARRAY_BUFFER
-    from pygltflib import FLOAT
-    from pygltflib import UNSIGNED_INT
-    from pygltflib import Accessor
-    from pygltflib import Buffer
-    from pygltflib import BufferView
-    from pygltflib import GLTF2
-    from pygltflib import Material
-    from pygltflib import Mesh
-    from pygltflib import Node
-    from pygltflib import PbrMetallicRoughness
-    from pygltflib import Primitive
-    from pygltflib import Scene
+    from pygltflib import (
+        ARRAY_BUFFER,
+        ELEMENT_ARRAY_BUFFER,
+        FLOAT,
+        GLTF2,
+        UNSIGNED_INT,
+        Accessor,
+        Buffer,
+        BufferView,
+        Material,
+        Mesh,
+        Node,
+        PbrMetallicRoughness,
+        Primitive,
+        Scene,
+    )
 except ModuleNotFoundError:
     ARRAY_BUFFER = ELEMENT_ARRAY_BUFFER = FLOAT = UNSIGNED_INT = 0
     Accessor = Buffer = BufferView = GLTF2 = Material = Mesh = Node = object  # type: ignore[assignment]
@@ -104,7 +106,9 @@ def parse_tile(value: str) -> tuple[int, int]:
     return (row, col)
 
 
-def subdivide_bbox_4x4(minx: float, miny: float, maxx: float, maxy: float) -> list[TileInfo]:
+def subdivide_bbox_4x4(
+    minx: float, miny: float, maxx: float, maxy: float
+) -> list[TileInfo]:
     width = (maxx - minx) / 4.0
     height = (maxy - miny) / 4.0
     tiles: list[TileInfo] = []
@@ -261,7 +265,7 @@ def query_osm_buildings(
         ST_AsGeoJSON(way) AS geometry,
         levels
     FROM osm_buildings
-    WHERE ST_Intersects(way, ST_Transform(ST_GeomFromText(%s), 3857))
+    WHERE ST_Intersects(way, ST_Transform(ST_GeomFromEWKT(%s), 3857))
     """
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
@@ -297,7 +301,9 @@ def wgs84_to_mercator(lon: float, lat: float) -> tuple[float, float]:
     return (x, y)
 
 
-def calculate_tile_origin(bbox: tuple[float, float, float, float]) -> tuple[float, float]:
+def calculate_tile_origin(
+    bbox: tuple[float, float, float, float],
+) -> tuple[float, float]:
     minx, miny, maxx, maxy = bbox
     if abs(minx) < 180 and abs(maxx) < 180 and abs(miny) < 90 and abs(maxy) < 90:
         min_mercator = wgs84_to_mercator(minx, miny)
@@ -436,9 +442,7 @@ def buildings_to_glb(
 
 
 def process_tile(
-    args: tuple[
-        TileInfo, dict[str, Any], tuple[float, float], Path, bool
-    ]
+    args: tuple[TileInfo, dict[str, Any], tuple[float, float], Path, bool],
 ) -> dict[str, Any]:
     tile, db_config, origin, output_dir, use_tile_origin = args
     started = time.time()
@@ -504,7 +508,9 @@ def generate_tiles_parallel(
         use_tile_origin = True
     else:
         tiles = all_tiles
-        print(f"Processing {len(tiles)} tiles in 4x4 grid with {num_workers} workers...")
+        print(
+            f"Processing {len(tiles)} tiles in 4x4 grid with {num_workers} workers..."
+        )
 
     print(f"Global origin: {global_origin}")
     print(f"Output directory: {output_dir}")
@@ -517,7 +523,9 @@ def generate_tiles_parallel(
     results: list[dict[str, Any]] = []
     total_tiles = len(tiles)
     with multiprocessing.Pool(processes=num_workers) as pool:
-        for i, result in enumerate(pool.imap_unordered(process_tile, worker_args), start=1):
+        for i, result in enumerate(
+            pool.imap_unordered(process_tile, worker_args), start=1
+        ):
             tile_name = result["tile"]
             tile_time = float(result.get("time", 0.0))
             if result["success"]:
@@ -537,7 +545,9 @@ def generate_tiles_parallel(
                 )
             results.append(result)
 
-    successful = sum(1 for item in results if item["success"] and not item.get("skipped"))
+    successful = sum(
+        1 for item in results if item["success"] and not item.get("skipped")
+    )
     skipped = sum(1 for item in results if item.get("skipped"))
     failed = sum(1 for item in results if not item["success"])
     total_buildings = sum(int(item.get("building_count", 0)) for item in results)

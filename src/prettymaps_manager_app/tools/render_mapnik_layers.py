@@ -187,7 +187,23 @@ def _make_spatial_filter(
     )
 
 
-def _mapnik_plugins_candidates(explicit: Path | None) -> list[Path]:
+# Relative sub-paths probed under each ancestor of the mapnik-render binary.
+# Covers layouts like:
+#   <root>/tools/mapnik/mapnik-render  -> <root>/bin/mapnik/input  (Windows bundle)
+#   <root>/bin/mapnik-render           -> <root>/lib/mapnik/input
+#   <root>/mapnik-render               -> <root>/input
+_BINARY_RELATIVE_PLUGIN_PATHS = (
+    "bin/mapnik/input",
+    "lib/mapnik/input",
+    "lib64/mapnik/input",
+    "input",
+)
+
+
+def _mapnik_plugins_candidates(
+    explicit: Path | None,
+    mapnik_render_bin: str | None = None,
+) -> list[Path]:
     candidates: list[Path] = []
 
     if explicit is not None:
@@ -198,6 +214,15 @@ def _mapnik_plugins_candidates(explicit: Path | None) -> list[Path]:
         value = str(os.environ.get(key, "")).strip()
         if value:
             candidates.append(Path(value))
+
+    # Walk up from the mapnik-render binary and probe well-known relative paths.
+    if mapnik_render_bin:
+        bin_path = Path(mapnik_render_bin).resolve()
+        ancestor = bin_path.parent
+        for _ in range(4):  # go up at most 4 levels
+            for rel in _BINARY_RELATIVE_PLUGIN_PATHS:
+                candidates.append(ancestor / rel)
+            ancestor = ancestor.parent
 
     candidates.extend(
         [
@@ -218,8 +243,11 @@ def _mapnik_plugins_candidates(explicit: Path | None) -> list[Path]:
     return unique
 
 
-def _find_plugins_dir(explicit: Path | None) -> Path | None:
-    for candidate in _mapnik_plugins_candidates(explicit):
+def _find_plugins_dir(
+    explicit: Path | None,
+    mapnik_render_bin: str | None = None,
+) -> Path | None:
+    for candidate in _mapnik_plugins_candidates(explicit, mapnik_render_bin):
         if not candidate.exists():
             continue
         # Homebrew mapnik commonly ships postgis+pgraster.input instead of postgis.input.
@@ -532,7 +560,7 @@ def _build_config(args: argparse.Namespace) -> RenderConfig:
 
 def run(cfg: RenderConfig) -> list[Path]:
     mapnik_render_bin = _require_mapnik_render()
-    plugins_dir = _find_plugins_dir(cfg.plugins_dir)
+    plugins_dir = _find_plugins_dir(cfg.plugins_dir, mapnik_render_bin)
     if plugins_dir is not None:
         _log(f"[mapnik-render] plugins: {plugins_dir}", cfg, force=True)
     else:

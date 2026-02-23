@@ -216,7 +216,7 @@ if [ "$SKIP_BUILDINGS" -eq 0 ]; then
 
     osm2pgsql -H "$PGHOST" -P "$PGPORT" -U "$PGUSER" \
       -O flex -S "$BUILDINGS_LUA" \
-      -d "$PGDATABASE" --number-processes 20 \
+      -d "$PGDATABASE" --number-processes 6 \
       "$OSM_FILE"
 
     if [ $? -ne 0 ]; then
@@ -261,7 +261,7 @@ if [ "$SKIP_MAPNIK" -eq 0 ]; then
 
     osm2pgsql -H "$PGHOST" -P "$PGPORT" -U "$PGUSER" \
       -O flex -S "$MAPNIK_LUA" \
-      -d "$PGDATABASE" --number-processes 20 \
+      -d "$PGDATABASE" --number-processes 6 \
       "$OSM_FILE"
 
     if [ $? -ne 0 ]; then

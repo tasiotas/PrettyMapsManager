@@ -3,10 +3,10 @@
 
 [paths]
 master_projects_dir_mac = "/Volumes/Vault/PrettyMaps/Projects"
-master_projects_dir_windows = "F:/PrettyMaps/Projects"
+master_projects_dir_windows = "Z:\\PrettyMaps\\Projects"
 
 elevation_vrt_mac = "/Volumes/Vault/PrettyMaps/Datasets/AW3D30/aw3d30_mac.vrt"
-elevation_vrt_windows = "F:/PrettyMaps/Datasets/AW3D30/aw3d30.vrt"
+elevation_vrt_windows = "Z:\\PrettyMaps\\Datasets\\AW3D30\\aw3d30.vrt"
 
 [database]
 host = "staging.taslab.lan"
